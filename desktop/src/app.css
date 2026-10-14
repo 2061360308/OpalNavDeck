@@ -1,0 +1,127 @@
+:root {
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--dt-bg, #0a0d14);
+  color: var(--dt-fg, #e8ecf4);
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* desktop shell: no text selection, no native element dragging */
+html,
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+img,
+a,
+svg {
+  -webkit-user-drag: none;
+}
+
+/* re-enable selection inside text surfaces (viewers, editors, inputs) */
+input,
+textarea,
+select,
+[contenteditable='true'],
+[contenteditable=''],
+.tv,
+.jv,
+.md,
+.pv,
+.iv,
+.viewer-app,
+.cm-editor,
+.jsoneditor,
+[data-selectable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* svelte-dnd-action drag clone: hidden — we draw our own unified silhouette (DragGhost).
+   The clone must stay in the DOM (the library uses it for geometry + the settle animation). */
+#dnd-action-dragged-el,
+#dnd-action-dragged-el * {
+  outline: none !important;
+}
+
+#dnd-action-dragged-el {
+  border: none !important;
+}
+
+/* valid drop zone feedback (pragmatic-dnd): subtle inset tint, no outline */
+.dnd-drop-ok {
+  background: color-mix(in srgb, var(--dt-accent, #6ea8ff) 10%, transparent) !important;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--dt-accent, #6ea8ff) 45%, transparent);
+  border-radius: 8px;
+}
+
+/* vertical insertion line at the hovered item's left/right edge */
+[data-dnd-edge='left']::before,
+[data-dnd-edge='right']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--dt-accent, #6ea8ff);
+  z-index: 5;
+  pointer-events: none;
+}
+[data-dnd-edge='left']::before {
+  left: 0;
+}
+[data-dnd-edge='right']::after {
+  right: 0;
+}
+
+/* keep items still while a drag is in progress (hover effects would shift targets) */
+body.dnd-active .card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* end-of-list insertion line (pointer over the list body, appends at the end) */
+.dnd-end::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--dt-accent, #6ea8ff);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* OS high-contrast mode: let the platform palette win for text/structure */
+@media (forced-colors: active) {
+  img,
+  svg,
+  video,
+  canvas {
+    forced-color-adjust: none;
+  }
+}

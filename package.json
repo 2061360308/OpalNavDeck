@@ -1,0 +1,22 @@
+{
+  "name": "opalnavdeck",
+  "private": true,
+  "version": "0.1.0",
+  "description": "OpalNavDeck — a beautiful, private, desktop-style resource navigation hub (Svelte 5 + Hono).",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "workspaces": [
+    "shared",
+    "desktop",
+    "server"
+  ],
+  "scripts": {
+    "dev:desktop": "npm -w desktop run dev",
+    "dev:server": "npm -w server run dev",
+    "build": "npm -w desktop run build",
+    "start": "npm -w server run start",
+    "check": "npm -w desktop run check"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@desktop/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./app": "./src/app.ts"
+  },
+  "scripts": {
+    "dev": "node --use-system-ca --env-file-if-exists=.env --watch src/platform/node.ts",
+    "start": "node --use-system-ca --env-file-if-exists=.env src/platform/node.ts"
+  },
+  "dependencies": {
+    "@desktop/shared": "*",
+    "@aws-sdk/client-s3": "^3.1148.0",
+    "@aws-sdk/s3-request-presigner": "^3.1148.0",
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0"
+  }
+}

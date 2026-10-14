@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-ssr/
+*.log
+*.local
+
+.env
+.env.*
+!.env.example
+
+desktop/node_modules/
+desktop/dist/
+server/node_modules/
+server/data/
+shared/node_modules/

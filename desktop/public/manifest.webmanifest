@@ -1,0 +1,17 @@
+{
+  "name": "OpalNavDeck",
+  "short_name": "OpalNavDeck",
+  "description": "私人资源导航 · 漂亮的桌面式主页",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#0a0d14",
+  "theme_color": "#0a0d14",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
