@@ -20,6 +20,9 @@ export interface Ticket {
   display?: string
   error?: string
   exp: number
+  /** device flow only */
+  deviceCode?: string
+  interval?: number
 }
 
 /**

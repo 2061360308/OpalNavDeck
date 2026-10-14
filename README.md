@@ -117,11 +117,14 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
 
 1. 用 `AUTH_USERNAME` / `AUTH_PASSWORD` 登录；
 2. 登录后在「账号与安全」中**绑定 GitHub 或支付宝**；
-3. 绑定后即可在登录页用对应方式登录（GitHub 重定向 / 支付宝扫码）。
+3. 绑定后即可在登录页用对应方式登录。
 
+- **GitHub**：默认**零配置**——内置一个公共 `client_id`，使用 **Device Flow**（登录页显示一个代码，去 `github.com/login/device` 输入即可，无需 client_secret、无需回调）。
+  - 想改用**自己的** OAuth App（跳转式）：设置 `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`，并把回调登记为 `<PUBLIC_BASE_URL>/api/auth/github/callback`。
+- **支付宝**：需自建开放平台应用，填 `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY`，扫码登录。
 - 会话：HttpOnly 签名 Cookie（无状态）。
 - `/dav` 仍使用 `DESKTOP_TOKEN`（供 WebDAV 客户端）。
-- OAuth 回调需公网 HTTPS 且域名已在对应平台登记。
+- 支付宝 OAuth 回调需公网 HTTPS 且域名已在开放平台登记。
 
 ## 🧩 皮肤与插件
 

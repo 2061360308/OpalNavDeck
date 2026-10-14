@@ -1,9 +1,9 @@
 import type { Hono } from 'hono'
-import { alipayConfigured, authEnabled, authUsername, githubConfigured, publicBaseUrl, verifyLogin, hashPassword } from './config.ts'
+import { alipayConfigured, authEnabled, authUsername, githubConfigured, githubMode, publicBaseUrl, verifyLogin, hashPassword } from './config.ts'
 import { clearSessionCookie, hasSession, setSessionCookie } from './cookie.ts'
 import type { Provider } from './store.ts'
 import { alipayCallback, alipayPoll, alipayQr } from './alipay.ts'
-import { githubCallback, githubStart } from './github.ts'
+import { githubCallback, githubDevicePoll, githubDeviceStart, githubStart } from './github.ts'
 import type { AuthContext } from './context.ts'
 
 export { hashPassword }
@@ -26,7 +26,7 @@ export function registerAuth(app: Hono, ctx: AuthContext) {
   const providerState = async () => {
     const ids = await store.getIdentities()
     return {
-      github: { configured: githubConfigured(env), bound: !!ids.github },
+      github: { configured: githubConfigured(env), bound: !!ids.github, mode: githubMode(env) },
       alipay: { configured: alipayConfigured(env), bound: !!ids.alipay },
     }
   }
@@ -75,6 +75,8 @@ export function registerAuth(app: Hono, ctx: AuthContext) {
 
   app.get('/api/auth/github/start', (c) => githubStart(c, ctx))
   app.get('/api/auth/github/callback', (c) => githubCallback(c, ctx))
+  app.get('/api/auth/github/device/start', (c) => githubDeviceStart(c, ctx))
+  app.get('/api/auth/github/device/poll', (c) => githubDevicePoll(c, ctx))
   app.get('/api/auth/alipay/qr', (c) => alipayQr(c, ctx))
   app.get('/api/auth/alipay/qr/poll', (c) => alipayPoll(c, ctx))
   app.get('/api/auth/alipay/callback', (c) => alipayCallback(c, ctx))

@@ -3,6 +3,8 @@ import { setAuthMode } from '../persist/api'
 export interface ProviderInfo {
   configured: boolean
   bound: boolean
+  /** github only: 'device' (no secret) or 'web' (custom OAuth app redirect) */
+  mode?: 'device' | 'web'
 }
 
 export interface AuthProviders {
@@ -26,7 +28,7 @@ class Auth {
   authenticated = $state(true)
   username = $state('')
   providers = $state<AuthProviders>({
-    github: { configured: false, bound: false },
+    github: { configured: false, bound: false, mode: 'device' },
     alipay: { configured: false, bound: false },
   })
   bindings = $state<Partial<Record<'github' | 'alipay', Binding>>>({})

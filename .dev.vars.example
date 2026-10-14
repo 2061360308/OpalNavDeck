@@ -25,7 +25,10 @@ AUTH_PASSWORD=secret
 SESSION_SECRET=dev-session-secret-change-me
 PUBLIC_BASE_URL=http://localhost:8787
 
-# GitHub OAuth
+# GitHub 登录
+# 默认零配置：内置公共 client_id，走 Device Flow（无需 secret/回调）。
+# 想用自己的 OAuth App（跳转式）再填下面两项，并登记回调
+#   <PUBLIC_BASE_URL>/api/auth/github/callback
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
 

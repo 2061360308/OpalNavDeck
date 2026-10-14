@@ -32,9 +32,13 @@ export function parseMediaUrl(url: string): { kind: string; file: string } | nul
   return m ? { kind: m[1], file: decodeURIComponent(m[2]) } : null
 }
 
-/** auth endpoints that are hit via full-page navigation (redirects / QR) */
+/** auth endpoints that are hit via full-page navigation (redirects / QR / device) */
 export const AUTH_URLS = {
   githubStart: (intent: 'login' | 'bind' = 'login') => `/api/auth/github/start?intent=${intent}`,
+  githubDeviceStart: (intent: 'login' | 'bind' = 'login') =>
+    `/api/auth/github/device/start?intent=${intent}`,
+  githubDevicePoll: (state: string, pollKey: string) =>
+    `/api/auth/github/device/poll?state=${encodeURIComponent(state)}&pollKey=${encodeURIComponent(pollKey)}`,
   alipayQr: (intent: 'login' | 'bind' = 'login') => `/api/auth/alipay/qr?intent=${intent}`,
   alipayPoll: (state: string, pollKey: string) =>
     `/api/auth/alipay/qr/poll?state=${encodeURIComponent(state)}&pollKey=${encodeURIComponent(pollKey)}`,

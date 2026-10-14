@@ -48,3 +48,7 @@ R2_PUBLIC_BUCKET = "opalnavdeck-public"
 #   GITHUB_CLIENT_SECRET, ALIPAY_PRIVATE_KEY
 # Optional override of the S3 endpoint instead of R2_ACCOUNT_ID:
 #   R2_ENDPOINT = "https://<account>.r2.cloudflarestorage.com"
+#
+# GitHub 登录默认零配置：内置公共 client_id，使用 Device Flow（无需 secret/回调）。
+# 想改用你自己的 OAuth App（跳转式）时，才设置 GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET，
+# 并把回调登记为 <PUBLIC_BASE_URL>/api/auth/github/callback。

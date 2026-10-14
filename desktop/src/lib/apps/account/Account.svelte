@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { auth } from '../../auth/session.svelte'
+  import { AUTH_URLS } from '@desktop/shared'
 
   let qr = $state('')
   let qrState = $state('')
@@ -8,13 +9,81 @@
   let qrError = $state('')
   let timer: ReturnType<typeof setInterval> | undefined
 
+  // GitHub device flow (bind)
+  let ghCode = $state('')
+  let ghVerifyUri = $state('https://github.com/login/device')
+  let ghState = $state('')
+  let ghPollKey = $state('')
+  let ghError = $state('')
+  let ghTimer: ReturnType<typeof setTimeout> | undefined
+
   function stopPoll() {
     if (timer) clearInterval(timer)
     timer = undefined
   }
 
+  function stopGh() {
+    if (ghTimer) clearTimeout(ghTimer)
+    ghTimer = undefined
+  }
+
   function bindGithub() {
-    location.href = '/api/auth/github/start?intent=bind'
+    if (auth.providers.github.mode === 'web') {
+      location.href = AUTH_URLS.githubStart('bind')
+    } else {
+      void startGithubDevice()
+    }
+  }
+
+  async function startGithubDevice() {
+    ghError = ''
+    stopGh()
+    const res = await fetch(AUTH_URLS.githubDeviceStart('bind'))
+    if (!res.ok) {
+      ghError = 'GitHub 绑定暂不可用'
+      return
+    }
+    const d = (await res.json()) as {
+      state: string
+      pollKey: string
+      userCode: string
+      verificationUri: string
+      interval: number
+    }
+    ghState = d.state
+    ghPollKey = d.pollKey
+    ghCode = d.userCode
+    ghVerifyUri = d.verificationUri
+    scheduleGhPoll(Math.max(2, d.interval || 5))
+  }
+
+  function scheduleGhPoll(sec: number) {
+    stopGh()
+    ghTimer = setTimeout(() => void ghPoll(), sec * 1000)
+  }
+
+  async function ghPoll() {
+    try {
+      const res = await fetch(AUTH_URLS.githubDevicePoll(ghState, ghPollKey))
+      const d = (await res.json()) as { status: string; error?: string; interval?: number }
+      if (d.status === 'done') {
+        stopGh()
+        ghCode = ''
+        await auth.init()
+      } else if (d.status === 'pending') {
+        scheduleGhPoll(Math.max(2, d.interval || 5))
+      } else if (d.status === 'expired') {
+        stopGh()
+        ghCode = ''
+        ghError = '验证码已过期，请重试'
+      } else {
+        stopGh()
+        ghCode = ''
+        ghError = d.error || '绑定失败'
+      }
+    } catch {
+      scheduleGhPoll(5)
+    }
   }
 
   async function bindAlipay() {
@@ -58,7 +127,10 @@
     await auth.unbind(provider)
   }
 
-  onDestroy(stopPoll)
+  onDestroy(() => {
+    stopPoll()
+    stopGh()
+  })
 </script>
 
 <div class="acct">
@@ -105,6 +177,18 @@
       </div>
     {/if}
     {#if qrError}<div class="err">{qrError}</div>{/if}
+
+    {#if ghCode}
+      <div class="qr">
+        <div class="devcode">{ghCode}</div>
+        <div class="tip">
+          在
+          <a href={ghVerifyUri} target="_blank" rel="noopener noreferrer">GitHub 设备授权页</a>
+          输入上面的代码以完成绑定
+        </div>
+      </div>
+    {/if}
+    {#if ghError}<div class="err">{ghError}</div>{/if}
 
     <div class="tip">绑定后即可在登录页使用对应方式登录。</div>
   </section>
@@ -194,5 +278,18 @@
   .err {
     color: #ff8080;
     font-size: 12px;
+  }
+  .devcode {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 24px;
+    letter-spacing: 4px;
+    font-weight: 700;
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .qr .tip a {
+    color: #6ea8ff;
   }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte'
   import { auth } from './session.svelte'
+  import { AUTH_URLS } from '@desktop/shared'
 
   let username = $state('')
   let password = $state('')
@@ -11,6 +12,15 @@
   let qrPollKey = $state('')
   let qrError = $state('')
   let timer: ReturnType<typeof setInterval> | undefined
+
+  // GitHub device flow
+  let ghCode = $state('')
+  let ghVerifyUri = $state('https://github.com/login/device')
+  let ghState = $state('')
+  let ghPollKey = $state('')
+  let ghError = $state('')
+  let ghBusy = $state(false)
+  let ghTimer: ReturnType<typeof setTimeout> | undefined
 
   const urlError = new URLSearchParams(location.search).get('auth_error')
   const notice = $state(
@@ -35,7 +45,73 @@
   }
 
   function githubLogin() {
-    location.href = '/api/auth/github/start?intent=login'
+    if (auth.providers.github.mode === 'web') {
+      location.href = AUTH_URLS.githubStart('login')
+    } else {
+      void startGithubDevice('login')
+    }
+  }
+
+  function stopGh() {
+    if (ghTimer) clearTimeout(ghTimer)
+    ghTimer = undefined
+  }
+
+  async function startGithubDevice(intent: 'login' | 'bind') {
+    ghError = ''
+    stopGh()
+    ghBusy = true
+    try {
+      const res = await fetch(AUTH_URLS.githubDeviceStart(intent))
+      if (!res.ok) {
+        ghError = 'GitHub 登录暂不可用'
+        return
+      }
+      const d = (await res.json()) as {
+        state: string
+        pollKey: string
+        userCode: string
+        verificationUri: string
+        interval: number
+      }
+      ghState = d.state
+      ghPollKey = d.pollKey
+      ghCode = d.userCode
+      ghVerifyUri = d.verificationUri
+      scheduleGhPoll(Math.max(2, d.interval || 5))
+    } catch (e) {
+      ghError = String(e)
+    } finally {
+      ghBusy = false
+    }
+  }
+
+  function scheduleGhPoll(sec: number) {
+    stopGh()
+    ghTimer = setTimeout(() => void ghPoll(), sec * 1000)
+  }
+
+  async function ghPoll() {
+    try {
+      const res = await fetch(AUTH_URLS.githubDevicePoll(ghState, ghPollKey))
+      const d = (await res.json()) as { status: string; error?: string; interval?: number }
+      if (d.status === 'done') {
+        stopGh()
+        await auth.init()
+      } else if (d.status === 'pending') {
+        scheduleGhPoll(Math.max(2, d.interval || 5))
+      } else if (d.status === 'expired') {
+        stopGh()
+        ghCode = ''
+        ghError = '验证码已过期，请重试'
+      } else {
+        stopGh()
+        ghCode = ''
+        ghError = d.error === 'unbound' ? '该账号尚未绑定，请先用密码登录后绑定' : d.error || '授权失败'
+      }
+    } catch {
+      scheduleGhPoll(5)
+    }
   }
 
   async function alipayLogin() {
@@ -77,7 +153,10 @@
     }
   }
 
-  onDestroy(stopPoll)
+  onDestroy(() => {
+    stopPoll()
+    stopGh()
+  })
 </script>
 
 <div class="login">
@@ -122,6 +201,21 @@
         {:else}
           <img src={qr} alt="支付宝登录二维码" />
           <div class="hint">请用支付宝扫码并确认授权</div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if ghCode || ghError}
+      <div class="qrdlg">
+        {#if ghError}
+          <div class="err">{ghError}</div>
+        {:else}
+          <div class="devcode">{ghCode}</div>
+          <div class="hint">
+            在
+            <a href={ghVerifyUri} target="_blank" rel="noopener noreferrer">GitHub 设备授权页</a>
+            输入上面的代码以完成登录
+          </div>
         {/if}
       </div>
     {/if}
@@ -256,5 +350,18 @@
     margin-top: 8px;
     color: #9aa4b5;
     font-size: 12px;
+  }
+  .devcode {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 26px;
+    letter-spacing: 4px;
+    font-weight: 700;
+    color: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .hint a {
+    color: #6ea8ff;
   }
 </style>
