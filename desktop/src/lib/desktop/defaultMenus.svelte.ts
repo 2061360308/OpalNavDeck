@@ -9,7 +9,7 @@ import { stage } from '../stage/stageState.svelte'
 import { wm } from '../state/windows.svelte'
 import type { MenuContext, MenuItem } from './types'
 import type { HoverMode } from '../types'
-import { openAccount, openResources } from '../apps/apps'
+import { openAccount, openResources, openSources } from '../apps/apps'
 
 function opacityItems(widgetId: string): MenuItem[] {
   const w = widgets.byId(widgetId)
@@ -220,6 +220,7 @@ export function installDefaultMenus() {
       action: () => openResources(),
     },
     { id: 'files', label: '文件管理', action: () => openFiles() },
+    { id: 'sources', label: '监控源', action: () => openSources() },
     { id: 'account', label: '账号与安全', action: () => openAccount() },
     { id: 'sep', separator: true },
     {

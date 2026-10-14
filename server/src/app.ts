@@ -14,6 +14,7 @@ import { assetBase, publicConfig, storageKind } from './storage/factory.ts'
 import { registerAuth } from './auth/index.ts'
 import { createAuthStore } from './auth/store.ts'
 import { apiAuthorized } from './auth/middleware.ts'
+import { registerSources } from './sources.ts'
 
 export interface AppDeps {
   provider: StorageProvider
@@ -475,6 +476,7 @@ export function createApp(deps: AppDeps) {
       return c.json({ ok: true })
     })
 
+  registerSources(app, { provider, env })
   registerAuth(app, { env, store })
   return app
 }

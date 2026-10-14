@@ -159,6 +159,16 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
 - 灵感来自 **Rainmeter** 与桌面组件生态。
 - 默认壁纸来源：wallhaven（如用于分发请遵守原作者许可）。
 
+## 🛰️ 服务器监控（可选）
+
+仓库内含一个配套监控 agent（`agent/`，Go）：装在每台被监控主机上，作为**通用插件宿主**暴露 HTTP API；桌面通过后端**代理批量轮询**（agent 可为纯 HTTP，令牌留在后端、不下发浏览器），后续用 widget 可视化。
+
+- 内置插件：`system`（CPU/内存/磁盘/网络/负载/uptime）、`ports`（监听端口 + 变更事件）。
+- 支持第三方插件（managed/external，进程隔离，可远程推送 manifest 安装）。
+- 详见 [`agent/README.md`](./agent/README.md) 与 [`docs/monitoring.md`](./docs/monitoring.md)。
+
+构建：`cd agent && go build -o bin/agentd ./cmd/agentd`。
+
 ## 📄 License
 
 [MIT](./LICENSE) © 2026 OpalNavDeck

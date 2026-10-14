@@ -33,8 +33,10 @@
   import { initDnd } from './lib/dnd/dnd.svelte'
   import { registerCoreCapabilities } from './lib/capabilities/core'
   import Account from './lib/apps/account/Account.svelte'
+  import Sources from './lib/apps/sources/Sources.svelte'
   import Login from './lib/auth/Login.svelte'
   import { auth } from './lib/auth/session.svelte'
+  import { sources } from './lib/sources/sources.svelte'
 
   registerCoreCapabilities()
   load()
@@ -49,6 +51,7 @@
     void init().then(() => {
       void skins.load()
       void plugins.load()
+      void sources.load()
     })
   }
 
@@ -140,6 +143,8 @@
           <RainmeterManager {win} />
         {:else if win.appId === 'account'}
           <Account />
+        {:else if win.appId === 'sources'}
+          <Sources />
         {:else if win.appId === 'files'}
           <RfmFileManager {win} />
         {:else if win.appId.startsWith('viewer')}

@@ -1,0 +1,9 @@
+{
+  "name": "srv1",
+  "listen": ":9797",
+  "token": "change-me",
+  "system": true,
+  "ports": true,
+  "ports_udp": false,
+  "plugins": []
+}

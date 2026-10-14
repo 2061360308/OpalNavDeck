@@ -21,3 +21,14 @@ export function openAccount() {
     h: 480,
   })
 }
+
+/** open (or focus) the monitoring sources window */
+export function openSources() {
+  return wm.open({
+    title: '监控源',
+    icon: '🛰️',
+    appId: 'sources',
+    w: 660,
+    h: 520,
+  })
+}
