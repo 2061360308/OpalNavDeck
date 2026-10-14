@@ -12,6 +12,7 @@ import {
 } from './storage/provider.ts'
 import { assetBase, publicConfig, storageKind } from './storage/factory.ts'
 import { registerAuth } from './auth/index.ts'
+import { createAuthStore } from './auth/store.ts'
 import { apiAuthorized } from './auth/middleware.ts'
 
 export interface AppDeps {
@@ -88,6 +89,21 @@ function packageBase(kind: 'skin' | 'plugin'): string {
  */
 export function createApp(deps: AppDeps) {
   const { provider, env } = deps
+  const store = createAuthStore(provider)
+
+  /** object mode: redirect to a presigned URL (no bytes through the server) */
+  const serveStored = async (c: any, path: string, cache: string): Promise<Response> => {
+    if (storageKind(env) === 'object' && provider.sign) {
+      try {
+        const { url } = await provider.sign({ op: 'get', path })
+        return c.redirect(url, 302)
+      } catch {
+        /* fall through to proxying */
+      }
+    }
+    const r = await provider.read(path)
+    return c.body(r.data as unknown as ArrayBuffer, 200, { 'Content-Type': r.mime, 'Cache-Control': cache })
+  }
 
   const listManifests = async (subdir: string, manifest: string): Promise<unknown[]> => {
     const out: unknown[] = []
@@ -143,7 +159,7 @@ export function createApp(deps: AppDeps) {
     // auth guard first: applies to the /api routes below; /api/auth/* is public
     .use('/api/*', async (c, next) => {
       if (c.req.path.startsWith('/api/auth/')) return next()
-      if (!apiAuthorized(c)) return c.json({ error: 'unauthorized' }, 401)
+      if (!(await apiAuthorized(c, env))) return c.json({ error: 'unauthorized' }, 401)
       await next()
     })
     .get('/api/health', (c) => c.json({ ok: true }))
@@ -178,27 +194,27 @@ export function createApp(deps: AppDeps) {
     .get('/api/storage/info', (c) => {
       const origin = new URL(c.req.url).origin
       const pub =
-        storageKind() === 'local'
+        storageKind(env) === 'local'
           ? ({ enabled: true, mode: 'prefix', root: '/', baseUrl: `${origin}/public` } as const)
-          : publicConfig()
+          : publicConfig(env)
       return c.json({
         ...provider.capabilities(origin),
-        provider: storageKind(),
+        provider: storageKind(env),
         hidden: HIDDEN_PREFIXES,
         readonly: READONLY_PREFIXES,
         public: pub,
-        assetBase: assetBase(origin),
+        assetBase: assetBase(env, origin),
       })
     })
     .get('/api/storage/public/check', async (c) => {
-      if (storageKind() === 'local') {
+      if (storageKind(env) === 'local') {
         return c.json({ ok: true, guidance: 'local serves /public from the storage root.' })
       }
       if (!provider.checkPublic) {
         return c.json({ ok: false, guidance: 'provider cannot validate public access.' })
       }
       try {
-        return c.json(await provider.checkPublic(publicConfig()))
+        return c.json(await provider.checkPublic(publicConfig(env)))
       } catch (e) {
         return c.json({ ok: false, guidance: String(e) })
       }
@@ -389,11 +405,7 @@ export function createApp(deps: AppDeps) {
       const file = c.req.param('file')
       if (!ASSET_RE.test(file)) return c.notFound()
       try {
-        const r = await provider.read(`${PATHS.assets}/${file}`)
-        return c.body(r.data as unknown as ArrayBuffer, 200, {
-          'Content-Type': r.mime,
-          'Cache-Control': 'public, max-age=31536000, immutable',
-        })
+        return await serveStored(c, `${PATHS.assets}/${file}`, 'public, max-age=31536000, immutable')
       } catch {
         return c.notFound()
       }
@@ -406,11 +418,18 @@ export function createApp(deps: AppDeps) {
       if (!dir || !file || file.includes('..') || file.includes('/') || file.includes('\\'))
         return c.notFound()
       try {
-        const r = await provider.read(`${dir}/${file}`)
-        return c.body(r.data as unknown as ArrayBuffer, 200, {
-          'Content-Type': r.mime,
-          'Cache-Control': 'public, max-age=86400',
-        })
+        return await serveStored(c, `${dir}/${file}`, 'public, max-age=86400')
+      } catch {
+        return c.notFound()
+      }
+    })
+
+    /* ---------- public code base (widgets/plugins), served from storage ---------- */
+    .use('/public/*', cors())
+    .get('/public/*', async (c) => {
+      const rel = c.req.path.replace(/^\/public/, '') || '/'
+      try {
+        return await serveStored(c, decodeURIComponent(rel), 'no-cache')
       } catch {
         return c.notFound()
       }
@@ -456,7 +475,7 @@ export function createApp(deps: AppDeps) {
       return c.json({ ok: true })
     })
 
-  registerAuth(app)
+  registerAuth(app, { env, store })
   return app
 }
 

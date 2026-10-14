@@ -1,0 +1,36 @@
+# Copy to `.dev.vars` for local `wrangler dev` testing (never commit .dev.vars).
+# Secrets likewise: `wrangler secret put AUTH_PASSWORD`, etc.
+
+STORAGE=object
+DESKTOP_TOKEN=dev-token
+
+# R2 buckets are provided as bindings in wrangler.toml (BUCKET, PUBLIC_BUCKET).
+# Give their names + S3 keys so presigned URLs can be generated.
+R2_BUCKET=opalnavdeck
+R2_PUBLIC_BUCKET=opalnavdeck-public
+R2_ACCOUNT_ID=
+# R2_ENDPOINT=                 # optional override of the S3 endpoint
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+
+# Code packages served straight from the public bucket (r2.dev subdomain).
+PUBLIC_BASE=https://pub-xxxxxxxx.r2.dev
+# S3_PREFIX=desktop
+# PUBLIC_PREFIX=desktop
+
+AUTH_ENABLED=1
+AUTH_USERNAME=admin
+AUTH_PASSWORD=secret
+# or: AUTH_PASSWORD_HASH=pbkdf2$210000$<saltB64>$<hashB64>
+SESSION_SECRET=dev-session-secret-change-me
+PUBLIC_BASE_URL=http://localhost:8787
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+
+# Alipay
+ALIPAY_APP_ID=
+ALIPAY_PRIVATE_KEY=
+ALIPAY_PUBLIC_KEY=
+ALIPAY_GATEWAY=https://openapi.alipay.com/gateway.do

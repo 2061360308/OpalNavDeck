@@ -1,28 +1,15 @@
 import type { Hono } from 'hono'
-import {
-  alipayConfigured,
-  authEnabled,
-  authUsername,
-  githubConfigured,
-  publicBaseUrl,
-  verifyLogin,
-} from './config.ts'
+import { alipayConfigured, authEnabled, authUsername, githubConfigured, publicBaseUrl, verifyLogin, hashPassword } from './config.ts'
 import { clearSessionCookie, hasSession, setSessionCookie } from './cookie.ts'
-import { readIdentities, removeBinding } from './identities.ts'
-import type { Provider } from './identities.ts'
+import type { Provider } from './store.ts'
 import { alipayCallback, alipayPoll, alipayQr } from './alipay.ts'
 import { githubCallback, githubStart } from './github.ts'
+import type { AuthContext } from './context.ts'
 
-function providerState() {
-  const ids = readIdentities()
-  return {
-    github: { configured: githubConfigured(), bound: !!ids.github },
-    alipay: { configured: alipayConfigured(), bound: !!ids.alipay },
-  }
-}
+export { hashPassword }
 
-function sameOrigin(c: any): boolean {
-  const base = publicBaseUrl()
+function sameOrigin(c: any, env: AuthContext['env']): boolean {
+  const base = publicBaseUrl(env)
   if (!base) return true
   const origin = c.req.header('Origin')
   if (!origin) return true
@@ -33,52 +20,62 @@ function sameOrigin(c: any): boolean {
   }
 }
 
-export function registerAuth(app: Hono) {
-  app.get('/api/auth/config', (c) => c.json({ enabled: authEnabled(), providers: providerState() }))
+export function registerAuth(app: Hono, ctx: AuthContext) {
+  const { env, store } = ctx
 
-  app.get('/api/auth/me', (c) => {
-    if (!authEnabled()) return c.json({ enabled: false, authenticated: true })
-    const authenticated = hasSession(c)
-    const providers = providerState()
+  const providerState = async () => {
+    const ids = await store.getIdentities()
+    return {
+      github: { configured: githubConfigured(env), bound: !!ids.github },
+      alipay: { configured: alipayConfigured(env), bound: !!ids.alipay },
+    }
+  }
+
+  app.get('/api/auth/config', async (c) => c.json({ enabled: authEnabled(env), providers: await providerState() }))
+
+  app.get('/api/auth/me', async (c) => {
+    if (!authEnabled(env)) return c.json({ enabled: false, authenticated: true })
+    const authenticated = await hasSession(c, env)
+    const providers = await providerState()
     if (!authenticated) return c.json({ enabled: true, authenticated: false, providers })
     return c.json({
       enabled: true,
       authenticated: true,
-      username: authUsername(),
+      username: authUsername(env),
       providers,
-      bindings: readIdentities(),
+      bindings: await store.getIdentities(),
     })
   })
 
   app.post('/api/auth/login', async (c) => {
-    if (!authEnabled()) return c.json({ ok: true })
-    if (!sameOrigin(c)) return c.json({ error: 'bad origin' }, 403)
+    if (!authEnabled(env)) return c.json({ ok: true })
+    if (!sameOrigin(c, env)) return c.json({ error: 'bad origin' }, 403)
     const body = (await c.req.json().catch(() => ({}))) as { username?: string; password?: string }
-    if (!verifyLogin(String(body.username ?? ''), String(body.password ?? ''))) {
+    if (!(await verifyLogin(env, String(body.username ?? ''), String(body.password ?? '')))) {
       return c.json({ error: 'invalid credentials' }, 401)
     }
-    setSessionCookie(c)
+    await setSessionCookie(c, env)
     return c.json({ ok: true })
   })
 
   app.post('/api/auth/logout', (c) => {
-    clearSessionCookie(c)
+    clearSessionCookie(c, env)
     return c.json({ ok: true })
   })
 
   app.post('/api/auth/unbind', async (c) => {
-    if (authEnabled() && !hasSession(c)) return c.json({ error: 'unauthorized' }, 401)
-    if (!sameOrigin(c)) return c.json({ error: 'bad origin' }, 403)
+    if (authEnabled(env) && !(await hasSession(c, env))) return c.json({ error: 'unauthorized' }, 401)
+    if (!sameOrigin(c, env)) return c.json({ error: 'bad origin' }, 403)
     const body = (await c.req.json().catch(() => ({}))) as { provider?: string }
     const provider = body.provider as Provider
     if (provider !== 'github' && provider !== 'alipay') return c.json({ error: 'bad provider' }, 400)
-    removeBinding(provider)
+    await store.removeBinding(provider)
     return c.json({ ok: true })
   })
 
-  app.get('/api/auth/github/start', githubStart)
-  app.get('/api/auth/github/callback', githubCallback)
-  app.get('/api/auth/alipay/qr', alipayQr)
-  app.get('/api/auth/alipay/qr/poll', alipayPoll)
-  app.get('/api/auth/alipay/callback', alipayCallback)
+  app.get('/api/auth/github/start', (c) => githubStart(c, ctx))
+  app.get('/api/auth/github/callback', (c) => githubCallback(c, ctx))
+  app.get('/api/auth/alipay/qr', (c) => alipayQr(c, ctx))
+  app.get('/api/auth/alipay/qr/poll', (c) => alipayPoll(c, ctx))
+  app.get('/api/auth/alipay/callback', (c) => alipayCallback(c, ctx))
 }

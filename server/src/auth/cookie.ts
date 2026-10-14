@@ -1,32 +1,27 @@
-import { createHmac, timingSafeEqual } from 'node:crypto'
-import { publicBaseUrl, sessionSecret } from './config.ts'
+import { b64urlDecode, b64urlEncode, hmac, timingEqual } from './crypto.ts'
+import { publicBaseUrl, sessionSecret, type Env } from './config.ts'
 
 export const SESSION_COOKIE = 'dt_session'
 const TTL_SEC = 60 * 60 * 24 * 14
 
-function sign(body: string): string {
-  return createHmac('sha256', sessionSecret()).update(body).digest('base64url')
-}
-
-export function issueSession(): string {
+export async function issueSession(env: Env): Promise<string> {
   const payload = JSON.stringify({ u: 'owner', iat: Date.now(), exp: Date.now() + TTL_SEC * 1000 })
-  const body = Buffer.from(payload).toString('base64url')
-  return `${body}.${sign(body)}`
+  const body = b64urlEncode(payload)
+  const sig = await hmac(sessionSecret(env), body)
+  return `${body}.${sig}`
 }
 
-export function verifySession(value: string | undefined): boolean {
+export async function verifySession(env: Env, value: string | undefined): Promise<boolean> {
   if (!value) return false
   const i = value.lastIndexOf('.')
   if (i < 0) return false
   const body = value.slice(0, i)
   const sig = value.slice(i + 1)
-  const expect = sign(body)
-  const a = Buffer.from(sig)
-  const b = Buffer.from(expect)
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return false
+  const expect = await hmac(sessionSecret(env), body)
+  if (!timingEqual(new TextEncoder().encode(sig), new TextEncoder().encode(expect))) return false
   try {
-    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as { exp?: number }
-    return typeof payload.exp === 'number' && payload.exp > Date.now()
+    const p = JSON.parse(b64urlDecode(body)) as { exp?: number }
+    return typeof p.exp === 'number' && p.exp > Date.now()
   } catch {
     return false
   }
@@ -42,19 +37,19 @@ export function readCookie(c: any, name: string): string | undefined {
   return undefined
 }
 
-function attrs(maxAge: number): string {
-  const secure = publicBaseUrl().startsWith('https://') ? '; Secure' : ''
+function attrs(env: Env, maxAge: number): string {
+  const secure = publicBaseUrl(env).startsWith('https://') ? '; Secure' : ''
   return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`
 }
 
-export function hasSession(c: any): boolean {
-  return verifySession(readCookie(c, SESSION_COOKIE))
+export async function hasSession(c: any, env: Env): Promise<boolean> {
+  return verifySession(env, readCookie(c, SESSION_COOKIE))
 }
 
-export function setSessionCookie(c: any) {
-  c.header('Set-Cookie', `${SESSION_COOKIE}=${issueSession()}; ${attrs(TTL_SEC)}`)
+export async function setSessionCookie(c: any, env: Env) {
+  c.header('Set-Cookie', `${SESSION_COOKIE}=${await issueSession(env)}; ${attrs(env, TTL_SEC)}`)
 }
 
-export function clearSessionCookie(c: any) {
-  c.header('Set-Cookie', `${SESSION_COOKIE}=; ${attrs(0)}`)
+export function clearSessionCookie(c: any, env: Env) {
+  c.header('Set-Cookie', `${SESSION_COOKIE}=; ${attrs(env, 0)}`)
 }

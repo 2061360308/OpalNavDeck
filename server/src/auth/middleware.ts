@@ -1,10 +1,10 @@
-import { authEnabled, staticTokenOk } from './config.ts'
+import { authEnabled, staticTokenOk, type Env } from './config.ts'
 import { hasSession } from './cookie.ts'
 
 /** authorize an /api/* request: session cookie (auth mode) or legacy static token */
-export function apiAuthorized(c: any): boolean {
-  if (!authEnabled()) return staticTokenOk(c.req.header('Authorization'))
-  if (hasSession(c)) return true
-  if (process.env.ALLOW_STATIC_FOR_API === '1' && staticTokenOk(c.req.header('Authorization'))) return true
+export async function apiAuthorized(c: any, env: Env): Promise<boolean> {
+  if (!authEnabled(env)) return staticTokenOk(env, c.req.header('Authorization'))
+  if (await hasSession(c, env)) return true
+  if (env.ALLOW_STATIC_FOR_API === '1' && staticTokenOk(env, c.req.header('Authorization'))) return true
   return false
 }

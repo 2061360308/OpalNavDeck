@@ -1,0 +1,50 @@
+# Cloudflare Workers deployment for OpalNavDeck.
+# Cloudflare build settings:
+#   Root directory  : (repo root)
+#   Build command   : npm ci && npm run build      (builds the SPA into desktop/dist)
+
+name = "opalnavdeck"
+main = "server/src/platform/cloudflare.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Static SPA served by the platform; the Worker handles the dynamic routes.
+[assets]
+directory = "desktop/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/icons/*", "/media/*", "/plugins/*", "/public/*", "/skins/*"]
+
+# Two buckets: private (data) + public (code packages).
+#   wrangler r2 bucket create opalnavdeck
+#   wrangler r2 bucket create opalnavdeck-public
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "opalnavdeck"
+
+[[r2_buckets]]
+binding = "PUBLIC_BUCKET"
+bucket_name = "opalnavdeck-public"
+
+# Non-secret configuration. Public code (/Rainmeter/Skins, /Rainmeter/Plugins)
+# is served straight from the public bucket via its r2.dev subdomain.
+[vars]
+STORAGE = "object"
+DESKTOP_TOKEN = "change-me"
+R2_BUCKET = "opalnavdeck"
+R2_PUBLIC_BUCKET = "opalnavdeck-public"
+# R2_ACCOUNT_ID = "<your-account-id>"                       # used to build the S3 endpoint for presigning
+# PUBLIC_BASE = "https://pub-<hash>.r2.dev"                 # public bucket r2.dev URL
+# S3_PREFIX = "desktop"                                     # optional key prefix (data bucket)
+# PUBLIC_PREFIX = "desktop"                                 # optional key prefix (public bucket)
+# AUTH_ENABLED = "1"
+# AUTH_USERNAME = "admin"
+# PUBLIC_BASE_URL = "https://your-domain.example"
+
+# Secrets (set via dashboard or `wrangler secret put`), needed for presigned URLs
+# (private data) and/or login:
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   AUTH_PASSWORD (or AUTH_PASSWORD_HASH), SESSION_SECRET
+#   GITHUB_CLIENT_SECRET, ALIPAY_PRIVATE_KEY
+# Optional override of the S3 endpoint instead of R2_ACCOUNT_ID:
+#   R2_ENDPOINT = "https://<account>.r2.cloudflarestorage.com"

@@ -86,14 +86,14 @@ npm run start
 | `DESKTOP_FS_ROOT` | 本地存储根目录 | `server/data/desktop-fs` |
 | `S3_*` | 对象存储配置（bucket/region/endpoint/keys 等） | — |
 | `AUTH_ENABLED` | `1` 才开启登录 | 关闭 |
-| `AUTH_USERNAME` / `AUTH_PASSWORD`(`_HASH`) | 登录凭据（推荐用 scrypt 哈希） | — |
+| `AUTH_USERNAME` / `AUTH_PASSWORD`(`_HASH`) | 登录凭据（推荐用 PBKDF2 哈希） | — |
 | `SESSION_SECRET` | 会话 Cookie 签名密钥 | 不安全默认值 |
 | `PUBLIC_BASE_URL` | 对外基址（OAuth 回调、Cookie Secure） | — |
 | `GITHUB_CLIENT_ID/SECRET` | GitHub 登录 | — |
 | `ALIPAY_*` | 支付宝登录（appid/私钥/公钥/网关） | — |
 
 > 生成密码哈希：在 `server/` 下运行
-> `node --input-type=module -e "import('./src/auth/config.ts').then(m=>console.log(m.hashPassword('你的密码')))"`
+> `node --input-type=module -e "import('./src/auth/config.ts').then(async m=>console.log(await m.hashPassword('你的密码')))"`
 
 ## 💾 存储后端
 
@@ -135,10 +135,15 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
 ## 🌐 部署
 
 - **自托管（推荐）**：Node 进程同时提供 API、前端静态文件与 `/dav`。可用 Docker/系统服务承载，`npm run build && npm run start`。
-- **Serverless（Vercel / Cloudflare）**：架构已按平台拆分（`server/src/app.ts` 平台无关，`server/src/platform/*` 承载平台差异）。上 Serverless 时请：
-  - 使用**对象存储**（无本地磁盘/WebDAV）；
-  - 在 `platform/` 下新增对应入口（Vercel：默认导出 app；Cloudflare：Workers + 静态资源）；
-  - 认证明细亦可落对象存储的私有前缀。
+- **Cloudflare Workers**：`wrangler.toml`（Worker 入口 + 静态资源 + 两个 R2 绑定）。
+  1. 建两个桶：`wrangler r2 bucket create opalnavdeck`（私有，放数据）与 `opalnavdeck-public`（公开，放代码包）。
+  2. 给**公开桶**开启公开访问（r2.dev 子域或自定义域），把地址填到 `PUBLIC_BASE`。
+  3. 构建设置：**Root directory = 仓库根**、**Build command = `npm ci && npm run build`**（产物 `desktop/dist`）。
+  4. 密钥（控制台或 `wrangler secret put`）：`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`（私有数据预签名）、`SESSION_SECRET`、`AUTH_PASSWORD`（或 `_HASH`）、`GITHUB_CLIENT_SECRET`、`ALIPAY_PRIVATE_KEY`；非密放 `[vars]`（`STORAGE=object`、`R2_ACCOUNT_ID`/`R2_ENDPOINT`、`R2_BUCKET`、`R2_PUBLIC_BUCKET`、`PUBLIC_BASE`、`S3_PREFIX` …）。
+  5. 本地联调：`copy .dev.vars.example .dev.vars` → `npm run dev:cloudflare`；部署 `npm run deploy:cloudflare`。
+  > **代码包**（`/Rainmeter/Skins`、`/Rainmeter/Plugins`）放公开桶，经 r2.dev **直链加载**；**数据文件**走**后端预签名直连**（对象模式下 `/icons/assets`、`/media/*` 返回 302 到预签名 URL，`/api/fs/*` 的 blob 由前端 `S3Driver` 用 `sign` 直传/直下）。边缘无本地磁盘/WebDAV。
+  > 单桶 + 前缀公开（`PUBLIC_MODE=prefix`）仅 AWS S3/OSS/COS 支持；R2 只支持双桶（整桶公开）。
+- **其它 Serverless（Vercel 等）**：同理新增 `platform/*` 入口，并使用对象存储。
 
 ## 🗺️ 路线图
 

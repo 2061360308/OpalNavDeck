@@ -17,6 +17,8 @@
     "dev:server": "npm -w server run dev",
     "build": "npm -w desktop run build",
     "start": "npm -w server run start",
-    "check": "npm -w desktop run check"
+    "check": "npm -w desktop run check",
+    "deploy:cloudflare": "wrangler deploy",
+    "dev:cloudflare": "wrangler dev"
   }
 }
