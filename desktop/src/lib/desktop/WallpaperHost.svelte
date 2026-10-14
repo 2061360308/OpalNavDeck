@@ -7,6 +7,9 @@
 
   const wp = $derived(settings.wallpaper)
 
+  /** whether to show the Windows spotlight caption (title/copyright) */
+  let { caption: showCaption = true }: { caption?: boolean } = $props()
+
   let slideIndex = $state(0)
   let focusIndex = $state(0)
   let videoEl: HTMLVideoElement | undefined = $state()
@@ -125,7 +128,7 @@
     {/if}
   {/if}
 
-  {#if wp.mode === 'focus' && caption}
+  {#if wp.mode === 'focus' && showCaption && caption}
     <div class="spotlight-caption">
       <div class="sc-title">{caption.title}</div>
       <div class="sc-copy">{caption.copyright}</div>
