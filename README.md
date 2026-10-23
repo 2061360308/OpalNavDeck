@@ -169,7 +169,7 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
 - 桌面端提供监控源管理、实时指标预览，以及 `monitor` 能力 + 示例监控皮肤（Rainmeter 管理器 → 皮肤库 → 安装示例监控）。
 - 详见 [`agent/README.md`](./agent/README.md) 与 [`docs/monitoring.md`](./docs/monitoring.md)。
 
-构建：`cd agent && go build -o bin/agentd ./cmd/agentd`。
+构建：`cd agent && go build -o bin/agentd ./cmd/agentd`。版本见 `agent/VERSION`；推送到 `main` 且 `agent/` 有改动时，CI 自动发布 `agent-v<VERSION>` Release。
 
 ## 📄 License
 

@@ -104,6 +104,18 @@ Other languages can implement the JSON-RPC protocol directly
 - Container: `Dockerfile`.
 - Run as a service: use a systemd unit (Linux) or a Windows service wrapper.
 
+## Versioning and releases
+
+- The agent version lives in [`VERSION`](./VERSION) (semver). Bump it before merging
+  agent changes.
+- CI (`.github/workflows/agent-release.yml`) runs on every push to `main` and
+  checks whether anything under `agent/` changed.
+- If it changed, CI runs `go test ./...`, cross-builds linux/darwin/windows ×
+  amd64/arm64, and publishes a GitHub Release tagged `agent-v<VERSION>` with
+  archives plus `checksums.txt`.
+- Reusing an already released version fails the workflow; bump `VERSION` to
+  publish a new release.
+
 ## Notes
 
 - `ports` lists TCP sockets bound to `0.0.0.0`/`::`; PID/process names require

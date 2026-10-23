@@ -1,0 +1,182 @@
+name: Agent Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read and validate VERSION
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < agent/VERSION)"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error file=agent/VERSION::Invalid version '$version'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Detect agent changes
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            changed=true
+          else
+            before="${{ github.event.before }}"
+            if [[ -z "$before" || "$before" =~ ^0+$ ]]; then
+              changed=true
+            elif git diff --quiet "$before" "${{ github.sha }}" -- agent; then
+              changed=false
+            else
+              changed=true
+            fi
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+          if [[ "$changed" != "true" ]]; then
+            echo "No changes under agent/; skipping release."
+            exit 0
+          fi
+
+          version="${{ steps.version.outputs.version }}"
+          if gh release view "agent-v$version" >/dev/null 2>&1 || git rev-parse -q --verify "refs/tags/agent-v$version" >/dev/null; then
+            echo "::error::agent/VERSION $version has already been released (tag agent-v$version). Bump agent/VERSION before releasing new agent changes."
+            exit 1
+          fi
+          echo "Agent changed; will publish agent-v$version."
+
+  test:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.sum
+
+      - name: Test
+        working-directory: agent
+        run: go test ./...
+
+  build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            ext: ''
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            ext: ''
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: ''
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            ext: ''
+            archive: tar.gz
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            archive: zip
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+            archive: zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.sum
+
+      - name: Build
+        working-directory: agent
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "dist/agentd${{ matrix.ext }}" ./cmd/agentd
+
+          cd dist
+          name="opalnavdeck-agent_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            zip -q "${name}.zip" "agentd${{ matrix.ext }}"
+            rm "agentd${{ matrix.ext }}"
+          else
+            tar -czf "${name}.tar.gz" agentd
+            rm agentd
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: agent/dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [check, test, build]
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          rm -f checksums.txt
+          sha256sum *.tar.gz *.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "agent-v$VERSION" dist/* \
+            --target "${{ github.sha }}" \
+            --title "OpalNavDeck Agent v$VERSION" \
+            --generate-notes
