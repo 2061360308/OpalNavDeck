@@ -3,6 +3,9 @@
   import { wm } from '../../state/windows.svelte'
   import { widgets } from '../../state/widgets.svelte'
   import { skins } from '../../desktop/skins.svelte'
+  import { stage } from '../../stage/stageState.svelte'
+  import { toast } from '../../state/toast.svelte'
+  import { installSampleMonitor, SAMPLE_MONITOR_ID } from './sampleSkins'
   import {
     rm,
     POSITIONS,
@@ -25,6 +28,99 @@
   const selected = $derived(
     widgets.list.find((w) => w.id === rm.selectedWidgetId) ?? widgets.list[0] ?? null
   )
+
+  const availableSkins = $derived(
+    skins.list.filter((s) => !widgets.list.some((w) => w.skin === s.id))
+  )
+
+  let installing = $state(false)
+  let installInput: HTMLInputElement | undefined = $state()
+
+  function addSkin(skinId: string) {
+    const existing = widgets.list.find((x) => x.skin === skinId)
+    if (existing) {
+      rm.selectWidget(existing.id)
+      toast.show('该皮肤已在桌面')
+      return
+    }
+    const man = skins.get(skinId)
+    const w = man?.size?.w ?? 380
+    const h = man?.size?.h ?? 270
+    const step = widgets.list.length % 6
+    const x = Math.max(0, Math.min(stage.refW - w, Math.round((stage.refW - w) / 2) + step * 24))
+    const y = Math.max(0, Math.min(stage.refH - h, Math.round((stage.refH - h) / 2) + step * 24))
+    const widget = widgets.add(skinId, x, y)
+    rm.selectWidget(widget.id)
+    toast.show(`已添加皮肤：${man?.name ?? skinId}`)
+  }
+
+  async function installFromFolder(e: Event) {
+    const input = e.currentTarget as HTMLInputElement
+    const files = Array.from(input.files ?? [])
+    input.value = ''
+    if (files.length === 0) return
+    installing = true
+    try {
+      const entries = files.map((f) => {
+        const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name
+        return { rel, file: f }
+      })
+      const root = entries[0]?.rel.includes('/') ? entries[0].rel.split('/')[0] : ''
+      const files2 = entries
+        .map((en) => ({
+          path: root ? en.rel.split('/').slice(1).join('/') : en.rel,
+          file: en.file,
+        }))
+        .filter((f) => f.path)
+      const manifestFile = files2.find((f) => f.path === 'widget.json')
+      if (!manifestFile) {
+        toast.show('皮肤包缺少 widget.json')
+        return
+      }
+      const man = JSON.parse(await manifestFile.file.text())
+      const id = String(man?.id ?? '').trim()
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+        toast.show('widget.json 的 id 无效')
+        return
+      }
+      const ok = await skins.install(id, files2)
+      toast.show(ok ? `已安装皮肤：${man?.name ?? id}` : '安装失败')
+      if (ok) addSkin(id)
+    } catch (e) {
+      toast.show(`安装失败：${String(e)}`)
+    } finally {
+      installing = false
+    }
+  }
+
+  async function installSample() {
+    if (installing) return
+    installing = true
+    try {
+      const ok = await installSampleMonitor()
+      if (!ok) {
+        toast.show('安装示例皮肤失败')
+        return
+      }
+      toast.show('示例监控皮肤已安装')
+      addSkin(SAMPLE_MONITOR_ID)
+    } catch (e) {
+      toast.show(`安装示例皮肤失败：${String(e)}`)
+    } finally {
+      installing = false
+    }
+  }
+
+  async function removePackage(id: string, label: string) {
+    if (!window.confirm(`删除皮肤包「${label}」？桌面上的组件也会被移除。`)) return
+    const ok = await skins.removePackage(id)
+    if (!ok) {
+      toast.show('删除皮肤包失败')
+      return
+    }
+    for (const w of widgets.list.filter((x) => x.skin === id)) widgets.remove(w.id)
+    toast.show(`已删除皮肤包：${label}`)
+  }
 
   $effect(() => {
     if (!widgets.list.some((w) => w.id === rm.selectedWidgetId)) {
@@ -131,6 +227,39 @@
           {/if}
         </div>
 
+        <div class="library">
+          <div class="library-head">皮肤库</div>
+          {#if availableSkins.length === 0}
+            <div class="empty-tree">已全部添加到桌面</div>
+          {/if}
+          {#each availableSkins as s (s.id)}
+            <div class="lib-row">
+              <button class="lib-add" onclick={() => addSkin(s.id)} title="添加到桌面">
+                {s.name}
+              </button>
+              <button
+                class="lib-del"
+                onclick={() => removePackage(s.id, s.name)}
+                title="删除皮肤包"
+              >
+                ×
+              </button>
+            </div>
+          {/each}
+          <div class="lib-acts">
+            <button onclick={() => installInput?.click()} disabled={installing}>从文件夹安装</button>
+            <button onclick={installSample} disabled={installing}>安装示例监控</button>
+          </div>
+          <input
+            bind:this={installInput}
+            class="hidden-input"
+            type="file"
+            webkitdirectory
+            multiple
+            onchange={installFromFolder}
+          />
+        </div>
+
         <button class="rmskin">创建 .rmskin 皮肤包 ...</button>
       </aside>
 
@@ -144,7 +273,10 @@
             </div>
             <div class="head-btns">
               <button onclick={() => widgets.remove(selected.id)}>卸载</button>
-              <button>刷新</button>
+              <button onclick={() => skins.load()}>刷新</button>
+              <button onclick={() => removePackage(selected.skin, man?.name ?? selected.skin)}
+                >删除皮肤包</button
+              >
               <button>编辑</button>
             </div>
           </div>
@@ -412,6 +544,67 @@
   }
   .rmskin {
     margin-top: 8px;
+  }
+  .library {
+    margin-top: 8px;
+    max-height: 38%;
+    overflow: auto;
+    border: 1px solid var(--dt-border, #e2e6ec);
+    border-radius: 6px;
+    background: var(--dt-surface, #fff);
+    padding: 6px;
+  }
+  .library-head {
+    padding: 2px 4px 6px;
+    font-weight: 600;
+    color: var(--dt-fg, #2b3a4d);
+  }
+  .lib-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .lib-add {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    border-color: transparent;
+    background: transparent;
+  }
+  .lib-add:hover {
+    background: var(--dt-hover, #eef3fa);
+  }
+  .lib-del {
+    flex: 0 0 auto;
+    width: 24px;
+    padding: 2px 0;
+    color: var(--dt-fg-muted, #8a95a6);
+    border-color: transparent;
+    background: transparent;
+  }
+  .lib-del:hover {
+    color: #e04a4a;
+    background: var(--dt-hover, #eef3fa);
+  }
+  .lib-acts {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .lib-acts button {
+    width: 100%;
+  }
+  .lib-acts button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .hidden-input {
+    display: none;
   }
 
   .right {

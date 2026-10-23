@@ -109,6 +109,7 @@ widget/plugin 不直接访问 HTTP，而是调用宿主注册的**能力**：
 - `drive.*` — 读写自己的数据目录 `/Rainmeter/Data/<widgetId>/`（默认读写本目录）。
 - `net.fetch` — 后端代理网络。
 - `nav.list` / `nav.open` — 导航项。
+- `monitor.*` — 监控源与指标订阅（需皮肤声明 `monitor` 权限）。
 - 插件可 `expose` 新能力，暴露为 `desk.plugin.<id>.<ns>.<method>`。
 
 ### 图标（Icons）

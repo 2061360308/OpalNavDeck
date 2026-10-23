@@ -1,0 +1,20 @@
+{
+  "id": "monitor",
+  "name": "系统监控",
+  "version": "1.0.0",
+  "author": "OpalNavDeck",
+  "description": "展示监控源的 CPU、内存、磁盘、网络、端口与运行时间。",
+  "license": "MIT",
+  "entry": "index.html",
+  "size": { "w": 380, "h": 270 },
+  "permissions": ["monitor"],
+  "behavior": {
+    "opacity": 1,
+    "hover": "none",
+    "clickThrough": false,
+    "draggable": true,
+    "dragMode": "always",
+    "stayInBounds": true,
+    "snap": true
+  }
+}

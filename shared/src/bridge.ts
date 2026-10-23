@@ -33,6 +33,7 @@ export const BRIDGE_EVENT = {
   themeChanged: 'theme.changed',
   behaviorChanged: 'behavior.changed',
   capabilitiesChanged: 'capabilities.changed',
+  monitorData: 'monitor.data',
 } as const
 
 export interface BridgeMessage {

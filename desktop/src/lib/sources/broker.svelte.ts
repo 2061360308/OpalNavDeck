@@ -30,6 +30,31 @@ interface Sub {
   listener: Listener
 }
 
+function pickMetrics(m: SourceMetrics, keys?: string[]): SourceMetrics {
+  if (!keys?.length) return m
+  const plugins: Record<string, Record<string, unknown>> = {}
+  for (const raw of keys) {
+    const key = String(raw)
+    const dot = key.indexOf('.')
+    const pid = dot > 0 ? key.slice(0, dot) : ''
+    const out = dot > 0 ? key.slice(dot + 1) : key
+    if (!pid) {
+      for (const [p, vals] of Object.entries(m.plugins)) {
+        if (out in vals) (plugins[p] ??= {})[out] = vals[out]
+      }
+      continue
+    }
+    const vals = m.plugins[pid]
+    if (!vals) continue
+    if (out === '*') {
+      plugins[pid] = { ...vals }
+      continue
+    }
+    if (out in vals) (plugins[pid] ??= {})[out] = vals[out]
+  }
+  return { ...m, plugins }
+}
+
 class DataBroker {
   private subs = new Set<Sub>()
   private cache = new Map<string, SourceMetrics>()
@@ -49,7 +74,7 @@ class DataBroker {
     this.subs.add(sub)
     this.start()
     const cached = this.cache.get(source)
-    if (cached) listener(cached)
+    if (cached) listener(pickMetrics(cached, sub.keys))
     this.recompute()
     return () => {
       this.subs.delete(sub)
@@ -60,6 +85,15 @@ class DataBroker {
   /** Latest cached metrics for a source (may be stale/undefined). */
   get(source: string): SourceMetrics | undefined {
     return this.cache.get(source)
+  }
+
+  invalidate(source: string): void {
+    this.cache.delete(source)
+  }
+
+  refresh(source: string): void {
+    if (document.hidden) return
+    void this.fetchChunk([source])
   }
 
   private start() {
@@ -124,16 +158,44 @@ class DataBroker {
     try {
       const query = ids.map(encodeURIComponent).join(',')
       const res = await fetch(`/api/sources/metrics?ids=${query}`, { headers: authHeaders() })
-      if (!res.ok) return
-      const data = (await res.json()) as { sources?: Record<string, SourceMetrics> }
-      for (const [id, m] of Object.entries(data.sources ?? {})) {
-        this.cache.set(id, m)
-        for (const sub of this.subs) {
-          if (sub.source === id) sub.listener(m)
-        }
+      if (!res.ok) {
+        this.fail(ids, `status ${res.status}`)
+        return
       }
-    } catch {
-      /* transient; retry on next tick */
+      const data = (await res.json()) as { sources?: Record<string, Partial<SourceMetrics>> }
+      const got = new Set<string>()
+      for (const [id, raw] of Object.entries(data.sources ?? {})) {
+        got.add(id)
+        const m: SourceMetrics = {
+          ok: raw?.ok === true,
+          ts: typeof raw?.ts === 'number' ? raw.ts : Date.now(),
+          plugins: raw?.plugins ?? {},
+          error: raw?.error,
+        }
+        this.cache.set(id, m)
+        this.notify(id, m)
+      }
+      for (const id of ids) {
+        if (!got.has(id)) this.fail([id], 'no response')
+      }
+    } catch (e) {
+      this.fail(ids, String(e))
+    }
+  }
+
+  private fail(ids: string[], error: string) {
+    const ts = Date.now()
+    for (const id of ids) {
+      const prev = this.cache.get(id)
+      const m: SourceMetrics = { ok: false, ts, plugins: prev?.plugins ?? {}, error }
+      this.cache.set(id, m)
+      this.notify(id, m)
+    }
+  }
+
+  private notify(source: string, m: SourceMetrics) {
+    for (const sub of this.subs) {
+      if (sub.source === source) sub.listener(pickMetrics(m, sub.keys))
     }
   }
 }

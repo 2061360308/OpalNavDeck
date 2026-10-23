@@ -12,6 +12,7 @@ import { fs } from '../api/fs'
 import { services } from '../state/services.svelte'
 import { recent } from '../state/recent.svelte'
 import { widgets } from '../state/widgets.svelte'
+import { monitorHub } from '../sources/monitorHub'
 import { authHeaders } from '../persist/api'
 import { PATHS } from '@desktop/shared'
 
@@ -63,6 +64,17 @@ export function registerCoreCapabilities(): void {
   capabilities.register('core', 'net', {
     fetch: (p) => netProxy(p),
   })
+
+  capabilities.register(
+    'core',
+    'monitor',
+    {
+      sources: () => monitorHub.list(),
+      subscribe: (p, ctx) => monitorHub.subscribe(ctx.id, p),
+      unsubscribe: (p, ctx) => monitorHub.unsubscribe(ctx.id, String(p?.slot ?? 'default')),
+    },
+    'monitor'
+  )
 
   capabilities.register('core', 'nav', {
     list: () =>

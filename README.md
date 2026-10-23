@@ -161,10 +161,11 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
 
 ## 🛰️ 服务器监控（可选）
 
-仓库内含一个配套监控 agent（`agent/`，Go）：装在每台被监控主机上，作为**通用插件宿主**暴露 HTTP API；桌面通过后端**代理批量轮询**（agent 可为纯 HTTP，令牌留在后端、不下发浏览器），后续用 widget 可视化。
+仓库内含一个配套监控 agent（`agent/`，Go）：装在每台被监控主机上，作为**通用插件宿主**暴露 HTTP API；桌面通过后端**代理批量轮询**（agent 可为纯 HTTP，令牌留在后端、不下发浏览器），并用沙箱 widget 可视化。
 
 - 内置插件：`system`（CPU/内存/磁盘/网络/负载/uptime）、`ports`（监听端口 + 变更事件）。
 - 支持第三方插件（managed/external，进程隔离，可远程推送 manifest 安装）。
+- 桌面端提供监控源管理、实时指标预览，以及 `monitor` 能力 + 示例监控皮肤（Rainmeter 管理器 → 皮肤库 → 安装示例监控）。
 - 详见 [`agent/README.md`](./agent/README.md) 与 [`docs/monitoring.md`](./docs/monitoring.md)。
 
 构建：`cd agent && go build -o bin/agentd ./cmd/agentd`。

@@ -1,5 +1,11 @@
 import type { SkinManifest } from '../types'
 import { rpc } from '../api/rpc'
+import { authHeaders } from '../persist/api'
+
+export interface PackageFile {
+  path: string
+  file: File
+}
 
 /** Skins are code packages enumerated by the backend (`/api/pkg/list`). */
 class SkinsState {
@@ -18,6 +24,40 @@ class SkinsState {
 
   get(id: string): SkinManifest | undefined {
     return this.list.find((s) => s.id === id)
+  }
+
+  async install(id: string, files: PackageFile[]): Promise<boolean> {
+    if (!id || files.length === 0) return false
+    const body = new FormData()
+    body.append('kind', 'skin')
+    body.append('id', id)
+    for (const f of files) body.append(f.path, f.file, f.path)
+    try {
+      const res = await fetch('/api/pkg/install', {
+        method: 'POST',
+        headers: authHeaders(),
+        body,
+      })
+      if (!res.ok) return false
+      await this.load()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async removePackage(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/pkg?kind=skin&id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (!res.ok) return false
+      await this.load()
+      return true
+    } catch {
+      return false
+    }
   }
 }
 

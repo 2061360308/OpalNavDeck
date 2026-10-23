@@ -167,6 +167,7 @@ export function registerSources(app: Hono, deps: SourceDeps): void {
       ids.map(async (id): Promise<[string, any]> => {
         const src = byId.get(id)
         if (!src) return [id, { ok: false, error: 'unknown source' }]
+        if (src.enabled === false) return [id, { ok: false, error: 'disabled' }]
         const r = await callAgent(src.baseUrl, src.token, '/v1/metrics')
         if (!r.ok) return [id, { ok: false, error: r.error }]
         return [id, { ok: true, ts: r.json?.ts ?? Date.now(), plugins: r.json?.plugins ?? {} }]

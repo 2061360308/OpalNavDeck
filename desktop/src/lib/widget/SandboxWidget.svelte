@@ -6,6 +6,7 @@
   import { skins } from '../desktop/skins.svelte'
   import { settings } from '../desktop/settings.svelte'
   import { capabilities } from '../capabilities/registry'
+  import { monitorHub } from '../sources/monitorHub'
 
   interface Props {
     widget: Widget
@@ -79,8 +80,12 @@
         onContextMenu?.(r.left + cx * f, r.top + cy * f)
       },
     })
+    monitorHub.attach(widget.id, (event, data) => bridge?.postEvent(event, data))
     bridge.attach()
-    return () => bridge?.detach()
+    return () => {
+      monitorHub.detach(widget.id)
+      bridge?.detach()
+    }
   })
 
   $effect(() => {

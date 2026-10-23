@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>系统监控</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: rgba(22, 25, 32, 0.88);
+        --fg: #e9edf5;
+        --muted: #98a2b3;
+        --line: rgba(255, 255, 255, 0.09);
+        --track: rgba(255, 255, 255, 0.09);
+        --accent: #4f8cff;
+        --ok: #6ee7a8;
+        --warn: #ffb86b;
+      }
+      :root[data-theme='light'] {
+        color-scheme: light;
+        --bg: rgba(250, 251, 253, 0.94);
+        --fg: #1f2937;
+        --muted: #6b7280;
+        --line: rgba(15, 23, 42, 0.1);
+        --track: rgba(15, 23, 42, 0.08);
+        --accent: #2563eb;
+        --ok: #0f9d58;
+        --warn: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+        backdrop-filter: blur(14px);
+        overflow: hidden;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .title {
+        font-weight: 600;
+        font-size: 14px;
+        white-space: nowrap;
+      }
+      select {
+        flex: 1;
+        min-width: 0;
+        height: 26px;
+        padding: 0 8px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+        flex: 0 0 auto;
+      }
+      .dot.online {
+        background: var(--ok);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--ok) 60%, transparent);
+      }
+      .dot.offline {
+        background: #ff6b6b;
+      }
+      .bars {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .bar-row {
+        display: grid;
+        grid-template-columns: 34px 1fr 52px;
+        align-items: center;
+        gap: 8px;
+      }
+      .bar-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .bar-row b {
+        text-align: right;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      .track {
+        height: 6px;
+        border-radius: 999px;
+        background: var(--track);
+        overflow: hidden;
+      }
+      .fill {
+        height: 100%;
+        width: 0;
+        border-radius: 999px;
+        background: var(--accent);
+        transition: width 0.25s ease;
+      }
+      .fill.warn {
+        background: var(--warn);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 14px;
+        padding-top: 8px;
+        border-top: 1px solid var(--line);
+      }
+      .cell {
+        min-width: 0;
+      }
+      .cell span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .cell b {
+        display: block;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      footer {
+        margin-top: auto;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 11px;
+        min-height: 14px;
+      }
+      .empty {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="title">系统监控</div>
+      <select id="source" title="选择监控源"></select>
+      <div class="dot" id="dot"></div>
+    </header>
+
+    <div class="empty" id="empty">尚未配置监控源<br />请在桌面右键菜单打开「监控源」</div>
+
+    <div id="body" class="hidden" style="display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0">
+      <div class="bars">
+        <div class="bar-row">
+          <span>CPU</span>
+          <div class="track"><div class="fill" id="cpu-bar"></div></div>
+          <b id="cpu">--</b>
+        </div>
+        <div class="bar-row">
+          <span>内存</span>
+          <div class="track"><div class="fill" id="mem-bar"></div></div>
+          <b id="mem">--</b>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="cell"><span>磁盘（最高）</span><b id="disk">--</b></div>
+        <div class="cell"><span>监听端口</span><b id="ports">--</b></div>
+        <div class="cell"><span>网络下载</span><b id="rx">--</b></div>
+        <div class="cell"><span>网络上传</span><b id="tx">--</b></div>
+        <div class="cell"><span>运行时间</span><b id="uptime">--</b></div>
+        <div class="cell"><span>负载 1m</span><b id="load">--</b></div>
+      </div>
+
+      <footer>
+        <span id="updated">等待数据…</span>
+        <span id="error"></span>
+      </footer>
+    </div>
+
+    <script>
+      ;(function () {
+        var $ = function (id) {
+          return document.getElementById(id)
+        }
+
+        function num(v) {
+          return typeof v === 'number' && isFinite(v) ? v : 0
+        }
+
+        function fmtBytes(v) {
+          var n = num(v)
+          if (n <= 0) return '0 B'
+          var units = ['B', 'KB', 'MB', 'GB', 'TB']
+          var i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)))
+          return (n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
+        }
+
+        function fmtRate(v) {
+          return fmtBytes(v) + '/s'
+        }
+
+        function fmtPct(v) {
+          return num(v).toFixed(1) + '%'
+        }
+
+        function fmtUptime(v) {
+          var s = Math.max(0, Math.floor(num(v)))
+          var d = Math.floor(s / 86400)
+          var h = Math.floor((s % 86400) / 3600)
+          var m = Math.floor((s % 3600) / 60)
+          if (d > 0) return d + '天' + h + '时'
+          if (h > 0) return h + '时' + m + '分'
+          return m + '分'
+        }
+
+        function setBar(bar, pct) {
+          var v = Math.max(0, Math.min(100, num(pct)))
+          bar.style.width = v + '%'
+          bar.classList.toggle('warn', v >= 85)
+        }
+
+        desk.mount(function (desk) {
+          var current = ''
+          var config = {}
+
+          function sourceOptions(list) {
+            var sel = $('source')
+            sel.innerHTML = ''
+            for (var i = 0; i < list.length; i++) {
+              var opt = document.createElement('option')
+              opt.value = list[i].id
+              opt.textContent = list[i].name || list[i].baseUrl
+              sel.appendChild(opt)
+            }
+            sel.value = current
+          }
+
+          function showEmpty(text) {
+            $('empty').classList.remove('hidden')
+            $('body').classList.add('hidden')
+            $('dot').className = 'dot'
+            if (text) $('empty').innerHTML = text
+          }
+
+          function showBody() {
+            $('empty').classList.add('hidden')
+            $('body').classList.remove('hidden')
+          }
+
+          function subscribe() {
+            if (!current) return
+            $('error').textContent = ''
+            desk.monitor
+              .subscribe({
+                source: current,
+                keys: [
+                  'system.cpu.total',
+                  'system.mem.usedPercent',
+                  'system.disks',
+                  'system.net',
+                  'system.uptime',
+                  'system.load.1',
+                  'ports.count',
+                ],
+                interval: 2000,
+              })
+              .then(function (r) {
+                if (r && !r.ok) {
+                  $('error').textContent = r.error || '订阅失败'
+                  $('dot').className = 'dot offline'
+                }
+              })
+            $('updated').textContent = '等待数据…'
+          }
+
+          desk.on('monitor.data', function (m) {
+            if (!m || m.source !== current) return
+            showBody()
+            var sys = (m.plugins && m.plugins.system) || {}
+            var ports = (m.plugins && m.plugins.ports) || {}
+            var cpu = sys['cpu.total']
+            var mem = sys['mem.usedPercent']
+            setBar($('cpu-bar'), cpu)
+            setBar($('mem-bar'), mem)
+            $('cpu').textContent = fmtPct(cpu)
+            $('mem').textContent = fmtPct(mem)
+            $('ports').textContent = String(num(ports.count))
+            $('uptime').textContent = fmtUptime(sys['uptime'])
+            $('load').textContent = num(sys['load.1']).toFixed(2)
+
+            var disks = Array.isArray(sys['disks']) ? sys['disks'] : []
+            var disk = 0
+            for (var i = 0; i < disks.length; i++) {
+              disk = Math.max(disk, num(disks[i] && disks[i].usedPercent))
+            }
+            $('disk').textContent = disks.length ? fmtPct(disk) : '--'
+
+            var net = sys['net'] && typeof sys['net'] === 'object' ? sys['net'] : {}
+            var rx = 0
+            var tx = 0
+            Object.keys(net).forEach(function (name) {
+              rx += num(net[name] && net[name].rxRate)
+              tx += num(net[name] && net[name].txRate)
+            })
+            $('rx').textContent = fmtRate(rx)
+            $('tx').textContent = fmtRate(tx)
+
+            if (m.ok) {
+              $('updated').textContent = '更新于 ' + new Date(m.ts).toLocaleTimeString()
+              $('dot').className = 'dot online'
+              $('error').textContent = ''
+            } else {
+              $('updated').textContent = '离线'
+              $('dot').className = 'dot offline'
+              $('error').textContent = m.error || '离线'
+            }
+          })
+
+          function init() {
+            Promise.all([Promise.resolve(desk.settings.get()), Promise.resolve(desk.monitor.sources())])
+              .then(function (res) {
+                config = res[0] || {}
+                var list = res[1] || []
+                if (!list.length) {
+                  showEmpty('尚未配置监控源<br />请在桌面右键菜单打开「监控源」')
+                  return
+                }
+                current = config.source && list.some(function (s) { return s.id === config.source })
+                  ? config.source
+                  : list[0].id
+                sourceOptions(list)
+                $('source').onchange = function (e) {
+                  current = e.target.value
+                  config.source = current
+                  desk.settings.set({ value: config })
+                  $('dot').className = 'dot'
+                  subscribe()
+                }
+                showBody()
+                subscribe()
+              })
+              .catch(function (e) {
+                showEmpty('监控能力不可用<br />请检查皮肤权限')
+                $('error').textContent = String(e)
+              })
+          }
+
+          init()
+        })
+      })()
+    </script>
+  </body>
+</html>
