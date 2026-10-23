@@ -37,9 +37,10 @@ R2_PUBLIC_BUCKET = "opalnavdeck-public"
 # PUBLIC_BASE = "https://pub-<hash>.r2.dev"                 # public bucket r2.dev URL
 # S3_PREFIX = "desktop"                                     # optional key prefix (data bucket)
 # PUBLIC_PREFIX = "desktop"                                 # optional key prefix (public bucket)
-# AUTH_ENABLED = "1"
+# Non-secret auth settings must live here (Git builds overwrite dashboard Variables).
+AUTH_ENABLED = "1"
 # AUTH_USERNAME = "admin"
-# PUBLIC_BASE_URL = "https://your-domain.example"
+# PUBLIC_BASE_URL = "https://your-domain.example"           # required for OAuth callbacks + Secure cookies
 
 # Secrets (set via dashboard or `wrangler secret put`), needed for presigned URLs
 # (private data) and/or login:

@@ -142,7 +142,8 @@ System/system.json|desktop.json   系统与桌面配置（程序管理）
   1. 建两个桶：`wrangler r2 bucket create opalnavdeck`（私有，放数据）与 `opalnavdeck-public`（公开，放代码包）。
   2. 给**公开桶**开启公开访问（r2.dev 子域或自定义域），把地址填到 `PUBLIC_BASE`。
   3. 构建设置：**Root directory = 仓库根**、**Build command = `npm ci && npm run build`**（产物 `desktop/dist`）。
-  4. 密钥（控制台或 `wrangler secret put`）：`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`（私有数据预签名）、`SESSION_SECRET`、`AUTH_PASSWORD`（或 `_HASH`）、`GITHUB_CLIENT_SECRET`、`ALIPAY_PRIVATE_KEY`；非密放 `[vars]`（`STORAGE=object`、`R2_ACCOUNT_ID`/`R2_ENDPOINT`、`R2_BUCKET`、`R2_PUBLIC_BUCKET`、`PUBLIC_BASE`、`S3_PREFIX` …）。
+  4. 密钥（控制台或 `wrangler secret put`）：`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`（私有数据预签名）、`SESSION_SECRET`、`AUTH_PASSWORD`（或 `_HASH`）、`GITHUB_CLIENT_SECRET`、`ALIPAY_PRIVATE_KEY`；非密放 `[vars]`（`STORAGE=object`、`AUTH_ENABLED=1`、`AUTH_USERNAME`、`PUBLIC_BASE_URL`、`R2_ACCOUNT_ID`/`R2_ENDPOINT`、`R2_BUCKET`、`R2_PUBLIC_BUCKET`、`PUBLIC_BASE`、`S3_PREFIX` …）。
+     > 用 **Git 自动构建 / `wrangler deploy`** 时，非密变量必须写进 `wrangler.toml`；在 Cloudflare 控制台手动添加的普通变量会在下次部署时被覆盖。只有 Secret 会保留。
   5. 本地联调：`copy .dev.vars.example .dev.vars` → `npm run dev:cloudflare`；部署 `npm run deploy:cloudflare`。
   > **代码包**（`/Rainmeter/Skins`、`/Rainmeter/Plugins`）放公开桶，经 r2.dev **直链加载**；**数据文件**走**后端预签名直连**（对象模式下 `/icons/assets`、`/media/*` 返回 302 到预签名 URL，`/api/fs/*` 的 blob 由前端 `S3Driver` 用 `sign` 直传/直下）。边缘无本地磁盘/WebDAV。
   > 单桶 + 前缀公开（`PUBLIC_MODE=prefix`）仅 AWS S3/OSS/COS 支持；R2 只支持双桶（整桶公开）。
